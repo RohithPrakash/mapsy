@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Walk Visualizer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <style>
+    * { box-sizing: border-box; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: system-ui, sans-serif; }
+    #map { width: 100vw; height: 100vh; }
+    .panel {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000;
+    }
+    #stats-panel { top: 1rem; left: 1rem; min-width: 220px; max-width: 90vw; }
+    #controls { bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    #stats-panel h1 { margin: 0 0 0.5rem; font-size: 1rem; }
+    #stats-panel p { margin: 0.25rem 0; font-size: 0.9rem; }
+    #stats-panel .error { color: #b91c1c; }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+    input[type=range] { width: 200px; max-width: 60vw; }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+    }
+    #line-color {
+      border: none;
+      width: 32px;
+      height: 24px;
+      padding: 0;
+      cursor: pointer;
+    }
+    #line-weight { width: 80px; }
+    #line-weight-value { min-width: 1rem; text-align: center; }
+    .lander {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(90vw, 400px);
+      text-align: center;
+      z-index: 2000;
+    }
+    .lander h1 { margin: 0 0 0.5rem; font-size: 1.4rem; }
+    .lander p { margin: 0.5rem 0; font-size: 0.95rem; }
+    .drop-zone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 2rem 1rem;
+      margin: 1rem 0;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.05);
+    }
+    .drop-zone input { display: none; }
+    #upload-error { min-height: 1.2em; }
+    .hidden { display: none !important; }
+    #pace-legend { margin-top: 0.75rem; }
+    .legend-title { font-size: 0.85rem; margin: 0 0 0.25rem; font-weight: 600; }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+    }
+    #pace-gradient-bar {
+      width: 20px;
+      height: 80px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+    @media (max-width: 480px) {
+      #controls { width: calc(100% - 2rem); justify-content: center; }
+      input[type=range] { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="lander" class="panel lander">
+    <h1>Walk Visualizer</h1>
+    <p>Upload a <strong>.kml</strong> or <strong>.kmz</strong> file to visualize your walk.</p>
+    <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Upload a KML or KMZ file">
+      <span>Drag & drop a file here, or click to select</span>
+      <input id="file-input" type="file" accept=".kml,.kmz" />
+    </div>
+    <p class="hint">Supported: .kml, .kmz</p>
+    <p id="upload-error" class="error"></p>
+  </div>
+  <div id="stats-panel" class="panel hidden">
+    <h1>Walk Summary</h1>
+    <p id="stat-distance">Distance: —</p>
+    <p id="stat-duration">Duration: —</p>
+    <p id="stat-elevation">Elevation: —</p>
+    <div id="pace-legend" class="hidden">
+      <p class="legend-title">Pace (min/km)</p>
+      <div class="legend-row">
+        <span id="pace-max">30</span>
+        <div id="pace-gradient-bar"></div>
+        <span id="pace-min">0</span>
+      </div>
+    </div>
+    <button id="btn-upload-another">Upload another file</button>
+  </div>
+  <div id="controls" class="panel hidden">
+    <button id="btn-play">Play</button>
+    <button id="btn-pause">Pause</button>
+    <button id="btn-reset">Reset</button>
+    <input id="progress" type="range" min="0" max="100" value="0" step="0.1" aria-label="Playback progress" />
+    <label class="control-group">
+      Color
+      <input id="line-color" type="color" value="#0066cc" />
+    </label>
+    <label class="control-group">
+      Width
+      <input id="line-weight" type="range" min="1" max="12" value="4" />
+      <span id="line-weight-value">4</span>
+    </label>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script>
+    const KML_NS = 'http://www.opengis.net/kml/2.3';
+    const ANIMATION_DURATION_MS = 30000;
+
+    let map;
+    let ghostRoute = null;
+    let ghostRouteGroup = null;
+    let ghostSegmentPolylines = [];
+    let progressRoute = null;
+    let walker = null;
+    let startMarker = null;
+    let endMarker = null;
+    let latlngs = [];
+    let trackPoints = [];
+    let cumulativeDistances = [];
+    let totalDistance = 0;
+    let isPlaying = false;
+    let startTime = null;
+    let pausedProgress = 0;
+    let animationFrameId = null;
+
+    const playBtn = document.getElementById('btn-play');
+    const pauseBtn = document.getElementById('btn-pause');
+    const resetBtn = document.getElementById('btn-reset');
+    const progressInput = document.getElementById('progress');
+    const colorInput = document.getElementById('line-color');
+    const weightInput = document.getElementById('line-weight');
+    const weightValue = document.getElementById('line-weight-value');
+
+    const KML_NS_22 = 'http://www.opengis.net/kml/2.2';
+    const GX_NS = 'http://www.google.com/kml/ext/2.2';
+
+    function getChildrenByName(parent, localName) {
+      const ns = parent.namespaceURI || KML_NS;
+      let elements = parent.getElementsByTagNameNS(ns, localName);
+      if (elements.length === 0 && parent.namespaceURI) {
+        elements = parent.getElementsByTagName(localName);
+      }
+      return Array.from(elements);
+    }
+
+    function findTrackElements(doc) {
+      const tracks = new Set();
+      for (const ns of [KML_NS, KML_NS_22, GX_NS, null]) {
+        const list = ns ? doc.getElementsByTagNameNS(ns, 'Track') : doc.getElementsByTagName('Track');
+        for (const el of list) tracks.add(el);
+      }
+      // Also check gx:Track
+      for (const el of doc.getElementsByTagNameNS(GX_NS, 'Track')) tracks.add(el);
+      return Array.from(tracks);
+    }
+
+    function parseLineStringPoints(doc) {
+      const points = [];
+      const ns = doc.documentElement.namespaceURI || KML_NS;
+      const lineStrings = ns ? doc.getElementsByTagNameNS(ns, 'LineString') : doc.getElementsByTagName('LineString');
+      for (const ls of lineStrings) {
+        const coordEl = getChildrenByName(ls, 'coordinates')[0];
+        if (!coordEl) continue;
+        const text = coordEl.textContent.trim();
+        if (!text) continue;
+        const tuples = text.split(/\s+/);
+        for (const tuple of tuples) {
+          const parts = tuple.split(',').map(Number);
+          if (parts.length < 2 || parts.some(isNaN)) continue;
+          const [lon, lat, alt] = parts;
+          points.push({ lat, lon, alt: isNaN(alt) ? null : alt, time: null, speedMps: 0 });
+        }
+      }
+      return points;
+    }
+
+    function parseKML(kmlText) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(kmlText, 'application/xml');
+      const parseError = doc.querySelector('parsererror');
+      if (parseError || doc.documentElement.nodeName === 'parsererror') {
+        throw new Error('Failed to parse KML XML');
+      }
+
+      const points = [];
+      const tracks = findTrackElements(doc);
+
+      for (const track of tracks) {
+        const whens = getChildrenByName(track, 'when');
+        const coords = getChildrenByName(track, 'coord');
+
+        let speeds = [];
+        const extendedData = getChildrenByName(track, 'ExtendedData')[0];
+        if (extendedData) {
+          const arrays = getChildrenByName(extendedData, 'SimpleArrayData');
+          for (const arr of arrays) {
+            if (arr.getAttribute('name') === 'speed') {
+              const values = getChildrenByName(arr, 'value');
+              speeds = values.map(v => {
+                const text = v.textContent.trim();
+                return text ? parseFloat(text) : null;
+              });
+              break;
+            }
+          }
+        }
+
+        for (let i = 0; i < whens.length; i++) {
+          const timeText = whens[i].textContent.trim();
+          const coordText = coords[i] ? coords[i].textContent.trim() : '';
+          if (!coordText) continue;
+
+          const parts = coordText.split(/\s+/).map(Number);
+          if (parts.length < 2 || parts.some(isNaN)) continue;
+
+          const [lon, lat, alt] = parts;
+          const rawSpeed = speeds[i];
+          const speedMps = (rawSpeed !== undefined && !isNaN(rawSpeed) && rawSpeed > 0) ? rawSpeed : 0;
+
+          const time = timeText ? new Date(timeText) : null;
+          if (timeText && (!time || isNaN(time.getTime()))) continue;
+
+          points.push({
+            lat,
+            lon,
+            alt: isNaN(alt) ? null : alt,
+            time,
+            speedMps
+          });
+        }
+      }
+
+      if (points.length === 0) {
+        const linePoints = parseLineStringPoints(doc);
+        if (linePoints.length > 0) return linePoints;
+      }
+
+      return points;
+    }
+
+    function hexToRgb(hex) {
+      let clean = hex.replace('#', '');
+      if (clean.length === 3) {
+        clean = clean.split('').map(c => c + c).join('');
+      }
+      const bigint = parseInt(clean, 16);
+      const r = (bigint >> 16) & 255;
+      const g = (bigint >> 8) & 255;
+      const b = bigint & 255;
+      return { r: r / 255, g: g / 255, b: b / 255 };
+    }
+
+    function rgbToHsl(r, g, b) {
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return { h, s, l };
+    }
+
+    function hslToRgb(h, s, l) {
+      let r, g, b;
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+      }
+      return { r, g, b };
+    }
+
+    function componentToHex(c) {
+      const hex = Math.round(c * 255).toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    }
+
+    function hslToHex(h, s, l) {
+      const { r, g, b } = hslToRgb(h, s, l);
+      return '#' + componentToHex(r) + componentToHex(g) + componentToHex(b);
+    }
+
+    function hexToHsl(hex) {
+      const { r, g, b } = hexToRgb(hex);
+      return rgbToHsl(r, g, b);
+    }
+
+    function paceToColor(baseHex, paceNorm) {
+      const clamped = Math.max(0, Math.min(1, paceNorm));
+      const hsl = hexToHsl(baseHex);
+      hsl.l = hsl.l + clamped * (0.95 - hsl.l);
+      return hslToHex(hsl.h, hsl.s, hsl.l);
+    }
+
+    function speedToPace(speedMps) {
+      if (!speedMps || speedMps <= 0) return 30;
+      const pace = (1 / speedMps) * (1000 / 60);
+      return Math.min(pace, 30);
+    }
+
+    function computeSegmentPaces(points) {
+      const segmentPaces = [];
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = speedToPace(points[i].speedMps);
+        const p1 = speedToPace(points[i + 1].speedMps);
+        segmentPaces.push((p0 + p1) / 2);
+      }
+      return segmentPaces;
+    }
+
+    function toRad(deg) { return deg * Math.PI / 180; }
+
+    function haversineMeters(a, b) {
+      const R = 6371000;
+      const dLat = toRad(b.lat - a.lat);
+      const dLon = toRad(b.lon - a.lon);
+      const lat1 = toRad(a.lat);
+      const lat2 = toRad(b.lat);
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    }
+
+    function computeStats(points) {
+      let distance = 0;
+      let elevationGain = 0;
+      let elevationLoss = 0;
+
+      for (let i = 1; i < points.length; i++) {
+        distance += haversineMeters(points[i - 1], points[i]);
+        const prevAlt = points[i - 1].alt;
+        const currAlt = points[i].alt;
+        if (prevAlt !== null && currAlt !== null) {
+          const deltaAlt = currAlt - prevAlt;
+          if (deltaAlt > 0) elevationGain += deltaAlt;
+          else elevationLoss += Math.abs(deltaAlt);
+        }
+      }
+
+      let durationMs = null;
+      const startTime = points[0].time;
+      const endTime = points[points.length - 1].time;
+      if (startTime && endTime) {
+        durationMs = endTime - startTime;
+        if (isNaN(durationMs) || durationMs < 0) durationMs = null;
+      }
+
+      return { distance, durationMs, elevationGain, elevationLoss };
+    }
+
+    function formatDuration(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+      return `${minutes}m ${seconds}s`;
+    }
+
+    function initMap() {
+      map = L.map('map').setView([0, 0], 2);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(map);
+    }
+
+    function clearRouteLayers() {
+      if (ghostRoute) { map.removeLayer(ghostRoute); ghostRoute = null; }
+      if (ghostRouteGroup) { map.removeLayer(ghostRouteGroup); ghostRouteGroup = null; }
+      ghostSegmentPolylines = [];
+      if (progressRoute) { map.removeLayer(progressRoute); progressRoute = null; }
+      if (walker) { map.removeLayer(walker); walker = null; }
+      if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
+      if (endMarker) { map.removeLayer(endMarker); endMarker = null; }
+    }
+
+    function fitRouteBounds() {
+      if (!map) return;
+      map.invalidateSize();
+      const bounds = ghostRoute ? ghostRoute.getBounds() : (ghostRouteGroup ? ghostRouteGroup.getBounds() : null);
+      if (!bounds || !bounds.isValid()) return;
+      if (bounds.getNorthEast().equals(bounds.getSouthWest()) && latlngs.length > 0) {
+        map.setView(latlngs[0], 18);
+      } else {
+        map.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }
+
+    function updatePaceLegend(minPace, maxPace) {
+      const legend = document.getElementById('pace-legend');
+      const bar = document.getElementById('pace-gradient-bar');
+      const minLabel = document.getElementById('pace-min');
+      const maxLabel = document.getElementById('pace-max');
+      const baseColor = colorInput ? colorInput.value : '#0066cc';
+      const lightColor = paceToColor(baseColor, 1);
+
+      bar.style.background = `linear-gradient(to top, ${baseColor}, ${lightColor})`;
+      minLabel.textContent = minPace.toFixed(1);
+      maxLabel.textContent = maxPace.toFixed(1);
+      legend.classList.remove('hidden');
+    }
+
+    function hidePaceLegend() {
+      document.getElementById('pace-legend').classList.add('hidden');
+    }
+
+    function rebuildGhostRouteColors() {
+      if (!ghostRouteGroup || ghostSegmentPolylines.length === 0) return;
+      const baseColor = colorInput.value;
+
+      const segmentPaces = computeSegmentPaces(trackPoints);
+      const minPace = Math.min(...segmentPaces);
+      const maxPace = Math.max(...segmentPaces);
+      const paceRange = maxPace - minPace || 1;
+
+      for (let i = 0; i < ghostSegmentPolylines.length; i++) {
+        const paceNorm = (segmentPaces[i] - minPace) / paceRange;
+        ghostSegmentPolylines[i].setStyle({ color: paceToColor(baseColor, paceNorm) });
+      }
+    }
+
+    function updateLegendColors() {
+      if (document.getElementById('pace-legend').classList.contains('hidden')) return;
+      const segmentPaces = computeSegmentPaces(trackPoints);
+      const minPace = Math.min(...segmentPaces);
+      const maxPace = Math.max(...segmentPaces);
+      updatePaceLegend(minPace, maxPace);
+    }
+
+    function resetAnimationState() {
+      pausedProgress = 0;
+      isPlaying = false;
+      startTime = null;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+
+    function resetApplicationState() {
+      clearRouteLayers();
+      resetAnimationState();
+      latlngs = [];
+      trackPoints = [];
+      cumulativeDistances = [];
+      totalDistance = 0;
+      document.getElementById('stat-distance').textContent = 'Distance: —';
+      document.getElementById('stat-duration').textContent = 'Duration: —';
+      document.getElementById('stat-elevation').textContent = 'Elevation: —';
+      document.getElementById('progress').value = 0;
+      document.getElementById('upload-error').textContent = '';
+      document.getElementById('stats-panel').classList.add('hidden');
+      document.getElementById('controls').classList.add('hidden');
+      document.getElementById('lander').classList.remove('hidden');
+    }
+
+    function loadTrack(kmlText) {
+      trackPoints = parseKML(kmlText);
+
+      if (trackPoints.length === 0) {
+        throw new Error('No valid track points found in KML.');
+      }
+
+      if (trackPoints.length < 2) {
+        throw new Error('At least two track points are required to draw a route.');
+      }
+
+      clearRouteLayers();
+      resetAnimationState();
+
+      const stats = computeStats(trackPoints);
+      document.getElementById('stat-distance').textContent = `Distance: ${(stats.distance / 1000).toFixed(2)} km`;
+      document.getElementById('stat-duration').textContent = stats.durationMs !== null ? `Duration: ${formatDuration(stats.durationMs)}` : 'Duration: —';
+      document.getElementById('stat-elevation').textContent = `Elevation: +${stats.elevationGain.toFixed(0)} m / −${stats.elevationLoss.toFixed(0)} m`;
+
+      latlngs = trackPoints.map(p => [p.lat, p.lon]);
+
+      const hasSpeedData = trackPoints.some(p => p.speedMps > 0);
+
+      if (hasSpeedData) {
+        const segmentPaces = computeSegmentPaces(trackPoints);
+        const minPace = Math.min(...segmentPaces);
+        const maxPace = Math.max(...segmentPaces);
+        const paceRange = maxPace - minPace || 1;
+        const baseColor = colorInput ? colorInput.value : '#0066cc';
+
+        ghostRouteGroup = L.featureGroup().addTo(map);
+        ghostSegmentPolylines = [];
+
+        for (let i = 0; i < latlngs.length - 1; i++) {
+          const paceNorm = (segmentPaces[i] - minPace) / paceRange;
+          const segmentColor = paceToColor(baseColor, paceNorm);
+          const segment = L.polyline([latlngs[i], latlngs[i + 1]], {
+            color: segmentColor,
+            weight: 2,
+            opacity: 0.7
+          }).addTo(ghostRouteGroup);
+          ghostSegmentPolylines.push(segment);
+        }
+
+        updatePaceLegend(minPace, maxPace);
+      } else {
+        ghostRoute = L.polyline(latlngs, {
+          color: '#9ca3af',
+          weight: 2,
+          opacity: 0.5
+        }).addTo(map);
+        hidePaceLegend();
+      }
+
+      progressRoute = L.polyline([], {
+        color: colorInput ? colorInput.value : '#0066cc',
+        weight: weightInput ? parseInt(weightInput.value, 10) : 4,
+        opacity: 0.9
+      }).addTo(map);
+
+      startMarker = L.circleMarker(latlngs[0], { radius: 6, color: '#fff', fillColor: '#22c55e', fillOpacity: 1, weight: 2 })
+        .bindPopup('Start')
+        .addTo(map);
+
+      endMarker = L.circleMarker(latlngs[latlngs.length - 1], { radius: 6, color: '#fff', fillColor: '#ef4444', fillOpacity: 1, weight: 2 })
+        .bindPopup('End')
+        .addTo(map);
+
+      fitRouteBounds();
+
+      cumulativeDistances = [0];
+      for (let i = 1; i < latlngs.length; i++) {
+        cumulativeDistances.push(cumulativeDistances[i - 1] + haversineMeters(trackPoints[i - 1], trackPoints[i]));
+      }
+      totalDistance = cumulativeDistances[cumulativeDistances.length - 1];
+
+      walker = L.circleMarker(latlngs[0], {
+        radius: 8,
+        color: '#fff',
+        fillColor: '#3b82f6',
+        fillOpacity: 1,
+        weight: 2
+      }).addTo(map);
+
+      updateWalker(0);
+
+      document.getElementById('lander').classList.add('hidden');
+      document.getElementById('stats-panel').classList.remove('hidden');
+      document.getElementById('controls').classList.remove('hidden');
+    }
+
+    function findSegmentAndOffset(progress) {
+      const clamped = Math.max(0, Math.min(1, progress));
+      const targetDistance = clamped * totalDistance;
+      let seg = 0;
+      for (let i = 1; i < cumulativeDistances.length; i++) {
+        if (cumulativeDistances[i] >= targetDistance) { seg = i - 1; break; }
+      }
+      const segStart = cumulativeDistances[seg];
+      const segEnd = cumulativeDistances[seg + 1];
+      const segLen = segEnd - segStart || 1;
+      const segProgress = (targetDistance - segStart) / segLen;
+      return { seg, segProgress };
+    }
+
+    function interpolatePosition(progress) {
+      const { seg, segProgress } = findSegmentAndOffset(progress);
+      const [lat1, lon1] = latlngs[seg];
+      const [lat2, lon2] = latlngs[seg + 1] || [lat1, lon1];
+      return [lat1 + (lat2 - lat1) * segProgress, lon1 + (lon2 - lon1) * segProgress];
+    }
+
+    function getProgressLatLngs(progress) {
+      const { seg, segProgress } = findSegmentAndOffset(progress);
+      const [lat1, lon1] = latlngs[seg];
+      const [lat2, lon2] = latlngs[seg + 1] || [lat1, lon1];
+      const interpolated = [lat1 + (lat2 - lat1) * segProgress, lon1 + (lon2 - lon1) * segProgress];
+      const visible = latlngs.slice(0, seg + 1);
+      if (segProgress > 0) visible.push(interpolated);
+      return visible;
+    }
+
+    function updateWalker(progress) {
+      if (latlngs.length === 0) return;
+      const clamped = Math.max(0, Math.min(1, progress));
+      const pos = interpolatePosition(clamped);
+      if (walker) walker.setLatLng(pos);
+      progressInput.value = (clamped * 100).toFixed(1);
+
+      const visible = clamped > 0 ? getProgressLatLngs(clamped) : [];
+      if (progressRoute) progressRoute.setLatLngs(visible);
+    }
+
+    function animate(timestamp) {
+      if (!isPlaying) return;
+      if (startTime === null) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = pausedProgress + elapsed / ANIMATION_DURATION_MS;
+
+      if (progress >= 1) {
+        updateWalker(1);
+        isPlaying = false;
+        startTime = null;
+        pausedProgress = 0;
+        return;
+      }
+
+      updateWalker(progress);
+      animationFrameId = requestAnimationFrame(animate);
+    }
+
+    playBtn.addEventListener('click', () => {
+      if (isPlaying || latlngs.length === 0) return;
+      isPlaying = true;
+      startTime = null;
+      animationFrameId = requestAnimationFrame(animate);
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (!isPlaying) return;
+      isPlaying = false;
+      const now = performance.now();
+      const elapsed = now - (startTime ?? now);
+      pausedProgress += elapsed / ANIMATION_DURATION_MS;
+      pausedProgress = Math.max(0, Math.min(1, pausedProgress));
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+      startTime = null;
+    });
+
+    resetBtn.addEventListener('click', () => {
+      isPlaying = false;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+      pausedProgress = 0;
+      startTime = null;
+      if (progressRoute) progressRoute.setLatLngs([]);
+      updateWalker(0);
+    });
+
+    progressInput.addEventListener('input', () => {
+      isPlaying = false;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      pausedProgress = parseFloat(progressInput.value) / 100;
+      startTime = null;
+      updateWalker(pausedProgress);
+    });
+
+    colorInput.addEventListener('input', () => {
+      if (progressRoute) progressRoute.setStyle({ color: colorInput.value });
+      rebuildGhostRouteColors();
+      updateLegendColors();
+    });
+
+    weightInput.addEventListener('input', () => {
+      const weight = parseInt(weightInput.value, 10);
+      if (progressRoute) progressRoute.setStyle({ weight });
+      weightValue.textContent = weight;
+    });
+
+    document.getElementById('btn-upload-another').addEventListener('click', () => {
+      resetApplicationState();
+    });
+
+    async function extractKmlFromKmz(arrayBuffer) {
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      const entries = Object.values(zip.files).filter(f => /\.kml$/i.test(f.name));
+      if (entries.length === 0) {
+        throw new Error('No KML file found in the KMZ archive.');
+      }
+      const docEntry = entries.find(f => f.name.toLowerCase() === 'doc.kml');
+      const kmlEntry = docEntry || entries[0];
+      return await kmlEntry.async('string');
+    }
+
+    async function handleFileUpload(file) {
+      const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        throw new Error('File is too large. Please upload a file smaller than 50 MB.');
+      }
+      const uploadError = document.getElementById('upload-error');
+      uploadError.textContent = '';
+
+      const ext = file.name.split('.').pop().toLowerCase();
+      let kmlText;
+
+      try {
+        if (ext === 'kml') {
+          kmlText = await file.text();
+        } else if (ext === 'kmz') {
+          const arrayBuffer = await file.arrayBuffer();
+          kmlText = await extractKmlFromKmz(arrayBuffer);
+        } else {
+          throw new Error('Unsupported file type. Please upload .kml or .kmz.');
+        }
+
+        loadTrack(kmlText);
+      } catch (err) {
+        uploadError.textContent = err.message;
+        resetApplicationState();
+      }
+    }
+
+    function setupUploadEvents() {
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('file-input');
+
+      dropZone.addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) handleFileUpload(file);
+        fileInput.value = '';
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.add('drag-over');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('drag-over');
+        });
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer.files[0];
+        if (file) handleFileUpload(file);
+      });
+    }
+
+    initMap();
+    setupUploadEvents();
+  </script>
+</body>
+</html>
