@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Walk Visualizer</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
   <style>
     * { box-sizing: border-box; }
     body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: system-ui, sans-serif; }
@@ -79,6 +81,64 @@
       border-radius: 4px;
       border: 1px solid rgba(0,0,0,0.1);
     }
+    .preview-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.85rem;
+    }
+    .preview-field label {
+      color: #475569;
+    }
+    .preview-field select,
+    .preview-field button {
+      padding: 0.35rem;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+    }
+    .preview-field button.primary {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .preview-field button.primary:hover {
+      background: #2563eb;
+    }
+    #preview-modal.visible { display: flex !important; }
+    .preview-card.square { width: 420px; height: 420px; }
+    .preview-card.landscape { width: 560px; height: 315px; }
+    .preview-card.portrait { width: 315px; height: 560px; }
+    .preview-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .preview-actions {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+    .preview-actions button {
+      border: none;
+      background: rgba(255,255,255,0.92);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: #334155;
+    }
+    #preview-map .leaflet-tile,
+    #preview-map-host .leaflet-tile {
+      transition: none !important;
+      opacity: 1 !important;
+    }
     @media (max-width: 480px) {
       #controls { width: calc(100% - 2rem); justify-content: center; }
       input[type=range] { width: 100%; }
@@ -126,6 +186,69 @@
       <input id="line-weight" type="range" min="1" max="12" value="4" />
       <span id="line-weight-value">4</span>
     </label>
+    <button id="btn-share-preview">Share preview</button>
+  </div>
+
+  <div id="preview-panel" class="panel hidden" style="position: fixed; top: 16px; right: 16px; width: 280px; z-index: 1000;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <h2 style="margin: 0; font-size: 1.05rem;">Share preview</h2>
+      <button id="btn-preview-panel-close" style="background: none; border: none; font-size: 1.1rem; cursor: pointer; color: #64748b; padding: 0; line-height: 1;">×</button>
+    </div>
+    <div class="preview-field">
+      <label for="preview-basemap">Basemap</label>
+      <select id="preview-basemap">
+        <option value="voyager">CartoDB Voyager</option>
+        <option value="positron">CartoDB Positron</option>
+        <option value="dark">CartoDB Dark Matter</option>
+      </select>
+    </div>
+    <div class="preview-field">
+      <label for="preview-ratio">Aspect ratio</label>
+      <select id="preview-ratio">
+        <option value="square">1:1 square</option>
+        <option value="landscape">16:9 landscape</option>
+        <option value="portrait">9:16 portrait</option>
+      </select>
+    </div>
+    <div class="preview-field">
+      <label for="preview-duration">Preview length</label>
+      <select id="preview-duration">
+        <option value="3">3 seconds</option>
+        <option value="5" selected>5 seconds</option>
+        <option value="10">10 seconds</option>
+        <option value="15">15 seconds</option>
+        <option value="30">30 seconds</option>
+        <option value="60">60 seconds</option>
+      </select>
+    </div>
+    <div class="preview-field">
+      <label for="preview-loop">Loop</label>
+      <select id="preview-loop">
+        <option value="yes" selected>Loop forever</option>
+        <option value="no">Play once</option>
+      </select>
+    </div>
+    <div class="preview-field">
+      <label for="preview-format">Format</label>
+      <select id="preview-format">
+        <option value="mp4">MP4 / WebM</option>
+        <option value="gif">GIF</option>
+      </select>
+    </div>
+    <p id="gif-warning" class="error" style="font-size: 0.8rem; margin: 0 0 0.5rem;"></p>
+    <div class="preview-field">
+      <button id="btn-preview-generate" class="primary">Generate preview</button>
+    </div>
+  </div>
+
+  <div id="preview-modal" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 2000; display: none; align-items: center; justify-content: center;">
+    <div id="preview-card" class="preview-card square" style="position: relative; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.35);">
+      <div class="preview-actions">
+        <button id="btn-preview-close">Close</button>
+        <button id="btn-preview-download">Download</button>
+      </div>
+      <canvas id="preview-canvas" class="preview-canvas"></canvas>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -133,6 +256,21 @@
   <script>
     const KML_NS = 'http://www.opengis.net/kml/2.3';
     const ANIMATION_DURATION_MS = 30000;
+
+    const BASEMAP_CONFIGS = {
+      voyager: {
+        name: 'Voyager',
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+      },
+      positron: {
+        name: 'Positron',
+        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
+      },
+      dark: {
+        name: 'Dark',
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+      }
+    };
 
     let map;
     let ghostRoute = null;
@@ -150,6 +288,14 @@
     let startTime = null;
     let pausedProgress = 0;
     let animationFrameId = null;
+    let previewMap = null;
+    let previewMapTileLayer = null;
+    let previewAnimationId = null;
+    let previewStartTime = null;
+    let previewBackground = null;
+    let previewRouteDistances = [];
+    let previewDurationMs = 5000;
+    let previewLoopValue = 'yes';
 
     const playBtn = document.getElementById('btn-play');
     const pauseBtn = document.getElementById('btn-pause');
@@ -158,6 +304,133 @@
     const colorInput = document.getElementById('line-color');
     const weightInput = document.getElementById('line-weight');
     const weightValue = document.getElementById('line-weight-value');
+
+    const previewPanel = document.getElementById('preview-panel');
+    const btnSharePreview = document.getElementById('btn-share-preview');
+    const previewBasemap = document.getElementById('preview-basemap');
+    const previewRatio = document.getElementById('preview-ratio');
+    const previewDuration = document.getElementById('preview-duration');
+    const previewLoop = document.getElementById('preview-loop');
+    const previewFormat = document.getElementById('preview-format');
+    const btnPreviewGenerate = document.getElementById('btn-preview-generate');
+    const btnPreviewPanelClose = document.getElementById('btn-preview-panel-close');
+    const gifWarning = document.getElementById('gif-warning');
+
+    function updateGifWarning() {
+      if (previewFormat.value === 'gif' && parseInt(previewDuration.value, 10) >= 30) {
+        gifWarning.textContent = 'GIF generation for 30–60s previews may be slow and produce large files.';
+      } else {
+        gifWarning.textContent = '';
+      }
+    }
+
+    previewFormat.addEventListener('change', updateGifWarning);
+    previewDuration.addEventListener('change', updateGifWarning);
+
+    const previewModal = document.getElementById('preview-modal');
+    const previewCard = document.getElementById('preview-card');
+    const previewCanvas = document.getElementById('preview-canvas');
+    const btnPreviewClose = document.getElementById('btn-preview-close');
+    const btnPreviewDownload = document.getElementById('btn-preview-download');
+
+    function openPreviewModal() {
+      previewModal.classList.remove('hidden');
+      previewModal.classList.add('visible');
+    }
+
+    function closePreviewModal() {
+      previewModal.classList.remove('visible');
+      previewModal.classList.add('hidden');
+    }
+
+    btnPreviewClose.addEventListener('click', closePreviewModal);
+
+    btnPreviewDownload.addEventListener('click', async () => {
+      if (lastPreviewBlob) {
+        downloadBlob(lastPreviewBlob, formatExportFilename(lastPreviewExt));
+        return;
+      }
+      if (!previewBackground) return;
+
+      stopPreviewAnimation();
+      const durationMs = parseInt(previewDuration.value, 10) * 1000;
+      const loop = previewLoop.value;
+
+      btnPreviewDownload.disabled = true;
+      btnPreviewDownload.textContent = 'Rendering...';
+
+      try {
+        let blob;
+        if (previewFormat.value === 'gif') {
+          blob = await generatePreviewGif(previewCanvas, durationMs, loop);
+          lastPreviewExt = 'gif';
+        } else {
+          blob = await recordPreviewVideo(previewCanvas, durationMs);
+          lastPreviewExt = blob.type.includes('mp4') ? 'mp4' : 'webm';
+        }
+        lastPreviewBlob = blob;
+        downloadBlob(lastPreviewBlob, formatExportFilename(lastPreviewExt));
+      } catch (err) {
+        alert('Export failed: ' + err.message);
+      } finally {
+        btnPreviewDownload.disabled = false;
+        btnPreviewDownload.textContent = 'Download';
+      }
+    });
+
+    btnSharePreview.addEventListener('click', () => {
+      if (trackPoints.length === 0) return;
+      previewPanel.classList.toggle('hidden');
+    });
+
+    btnPreviewPanelClose.addEventListener('click', () => {
+      previewPanel.classList.add('hidden');
+    });
+
+    btnPreviewGenerate.addEventListener('click', async () => {
+      if (trackPoints.length === 0) return;
+      stopPreviewAnimation();
+      lastPreviewBlob = null;
+      btnPreviewDownload.textContent = 'Download';
+      btnPreviewDownload.disabled = false;
+
+      const basemapKey = previewBasemap.value;
+      const ratio = previewRatio.value;
+      const durationMs = parseInt(previewDuration.value, 10) * 1000;
+
+      const mapEl = document.getElementById('map');
+      const { width, height } = computeCanvasSize(mapEl.clientWidth, mapEl.clientHeight, ratio);
+
+      previewCard.className = 'preview-card ' + ratio;
+      previewCanvas.width = width;
+      previewCanvas.height = height;
+
+      openPreviewModal();
+
+      const backgroundCanvas = await capturePreviewBackground(width, height, basemapKey);
+      startPreviewAnimation(backgroundCanvas, durationMs, previewLoop.value);
+
+      if (previewFormat.value === 'mp4') {
+        isRenderingVideo = true;
+        lastPreviewBlob = null;
+        btnPreviewDownload.textContent = 'Rendering...';
+        btnPreviewDownload.disabled = true;
+        recordPreviewVideo(previewCanvas, durationMs)
+          .then(blob => {
+            lastPreviewBlob = blob;
+            lastPreviewExt = blob.type.includes('mp4') ? 'mp4' : 'webm';
+            btnPreviewDownload.textContent = 'Download';
+            btnPreviewDownload.disabled = false;
+            isRenderingVideo = false;
+          })
+          .catch(err => {
+            console.error(err);
+            btnPreviewDownload.textContent = 'Download';
+            btnPreviewDownload.disabled = false;
+            isRenderingVideo = false;
+          });
+      }
+    });
 
     const KML_NS_22 = 'http://www.opengis.net/kml/2.2';
     const GX_NS = 'http://www.google.com/kml/ext/2.2';
@@ -339,6 +612,288 @@
       hsl.l = hsl.l + clamped * (0.95 - hsl.l);
       return hslToHex(hsl.h, hsl.s, hsl.l);
     }
+
+    function haversine([lat1, lon1], [lat2, lon2]) {
+      const R = 6371000;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function computeRouteDistances(coords) {
+      const dists = [0];
+      for (let i = 1; i < coords.length; i++) {
+        dists.push(dists[i - 1] + haversine(coords[i - 1], coords[i]));
+      }
+      return dists;
+    }
+
+    function interpolatePoints(p1, p2, f) {
+      return [p1[0] + (p2[0] - p1[0]) * f, p1[1] + (p2[1] - p1[1]) * f];
+    }
+
+    function getPointAlongRoute(coords, distances, t) {
+      const clamped = Math.max(0, Math.min(1, t));
+      const total = distances[distances.length - 1];
+      if (total === 0 || coords.length === 0) return coords[0];
+      const target = clamped * total;
+      let i = 1;
+      while (i < distances.length && distances[i] < target) i++;
+      const segStart = distances[i - 1];
+      const segEnd = distances[i];
+      const segLen = segEnd - segStart;
+      const f = segLen === 0 ? 0 : (target - segStart) / segLen;
+      return interpolatePoints(coords[i - 1], coords[i], f);
+    }
+
+    function parseRatio(ratio) {
+      if (ratio === 'square') return 1;
+      if (ratio === 'landscape') return 16 / 9;
+      if (ratio === 'portrait') return 9 / 16;
+      return null;
+    }
+
+    function computeCanvasSize(containerWidth, containerHeight, ratioStr) {
+      const ratio = parseRatio(ratioStr);
+      if (ratio === null) return { width: containerWidth, height: containerHeight };
+      const containerRatio = containerWidth / containerHeight;
+      if (containerRatio > ratio) {
+        return { width: Math.round(containerHeight * ratio), height: containerHeight };
+      }
+      return { width: containerWidth, height: Math.round(containerWidth / ratio) };
+    }
+
+    function formatExportFilename(ext) {
+      const date = new Date().toISOString().slice(0, 10);
+      return `walk-preview-${date}.${ext}`;
+    }
+
+    function initPreviewMap(width, height, basemapKey) {
+      const host = document.getElementById('preview-map-host');
+      host.style.width = width + 'px';
+      host.style.height = height + 'px';
+      if (previewMap) previewMap.remove();
+      host.innerHTML = '<div id="preview-map" style="width:100%;height:100%;"></div>';
+      const el = document.getElementById('preview-map');
+      previewMap = L.map(el, {
+        attributionControl: false,
+        zoomControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false
+      });
+
+      const cfg = BASEMAP_CONFIGS[basemapKey] || BASEMAP_CONFIGS.voyager;
+      previewMapTileLayer = L.tileLayer(cfg.url, {
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(previewMap);
+
+      return previewMap;
+    }
+
+    function waitForTiles() {
+      return new Promise(resolve => {
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (previewMapTileLayer) previewMapTileLayer.off('load', done);
+          resolve();
+        };
+        const timer = setTimeout(done, 1500);
+        if (previewMapTileLayer) previewMapTileLayer.on('load', done);
+      });
+    }
+
+    async function capturePreviewBackground(width, height, basemapKey) {
+      const map = initPreviewMap(width, height, basemapKey);
+      if (latlngs.length > 0) {
+        map.fitBounds(latlngs, { padding: [40, 40] });
+      }
+      await waitForTiles();
+      const canvas = await html2canvas(document.getElementById('preview-map'), {
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        scale: 1,
+        width,
+        height
+      });
+      return canvas;
+    }
+
+    function preparePreviewCanvas(width, height, backgroundCanvas) {
+      const canvas = previewCanvas;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(backgroundCanvas, 0, 0, width, height);
+      return ctx;
+    }
+
+    function drawPreviewOverlay(ctx, width, height, stats, durationSec, loop) {
+      // Title background
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.fillRect(12, 12, 180, 32);
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 14px system-ui, sans-serif';
+      ctx.fillText('Walk preview', 20, 34);
+
+      // Stats box
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.fillRect(12, height - 56, 240, 44);
+      ctx.fillStyle = '#1e293b';
+      ctx.font = '12px system-ui, sans-serif';
+      ctx.fillText(`Distance: ${(stats.distance / 1000).toFixed(2)} km`, 20, height - 38);
+      ctx.fillText(`Duration: ${stats.durationMs !== null ? formatDuration(stats.durationMs) : '—'}`, 20, height - 24);
+      ctx.fillText(`Elevation: +${stats.elevationGain.toFixed(0)} m / −${stats.elevationLoss.toFixed(0)} m`, 20, height - 10);
+
+      // Loop badge
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(width - 90, height - 32, 78, 20);
+      ctx.fillStyle = '#fff';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillText(`${durationSec}s ${loop === 'yes' ? 'loop' : 'once'}`, width - 84, height - 18);
+    }
+
+    function drawWalker(ctx, latLng) {
+      if (!previewMap) return;
+      const point = previewMap.latLngToContainerPoint(latLng);
+      const x = point.x * (previewCanvas.width / previewMap.getContainer().clientWidth);
+      const y = point.y * (previewCanvas.height / previewMap.getContainer().clientHeight);
+
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ef4444';
+      ctx.fill();
+    }
+
+    function startPreviewAnimation(backgroundCanvas, durationMs, loop) {
+      previewBackground = backgroundCanvas;
+      previewDurationMs = durationMs;
+      previewLoopValue = loop;
+      previewRouteDistances = computeRouteDistances(latlngs);
+      previewStartTime = performance.now();
+
+      const ctx = previewCanvas.getContext('2d');
+      const stats = computeStats(trackPoints);
+      const durationSec = Math.round(durationMs / 1000);
+
+      function frame(now) {
+        const elapsed = now - previewStartTime;
+        let t = (elapsed % durationMs) / durationMs;
+        if (loop !== 'yes' && elapsed >= durationMs) t = 1;
+
+        ctx.drawImage(previewBackground, 0, 0, previewCanvas.width, previewCanvas.height);
+        const markerLatLng = getPointAlongRoute(latlngs, previewRouteDistances, t);
+        drawWalker(ctx, L.latLng(markerLatLng[0], markerLatLng[1]));
+        drawPreviewOverlay(ctx, previewCanvas.width, previewCanvas.height, stats, durationSec, loop);
+
+        if (loop === 'yes' || elapsed < durationMs) {
+          previewAnimationId = requestAnimationFrame(frame);
+        }
+      }
+
+      if (previewAnimationId) cancelAnimationFrame(previewAnimationId);
+      previewAnimationId = requestAnimationFrame(frame);
+    }
+
+    function stopPreviewAnimation() {
+      if (previewAnimationId) {
+        cancelAnimationFrame(previewAnimationId);
+        previewAnimationId = null;
+      }
+    }
+
+    function getSupportedVideoMimeType() {
+      const types = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      for (const type of types) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(type)) return type;
+      }
+      return null;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function recordPreviewVideo(canvas, durationMs) {
+      const mimeType = getSupportedVideoMimeType();
+      if (!mimeType) return Promise.reject(new Error('No supported video MIME type'));
+
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5000000 });
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+
+      return new Promise((resolve, reject) => {
+        recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+        recorder.onerror = () => reject(new Error('MediaRecorder error'));
+        recorder.start();
+        setTimeout(() => recorder.stop(), durationMs + 200);
+      });
+    }
+
+    async function generatePreviewGif(canvas, durationMs, loop, fps = 15) {
+      const totalFrames = Math.ceil((durationMs / 1000) * fps);
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        width: canvas.width,
+        height: canvas.height,
+        workerScript: 'lib/gif.worker.js'
+      });
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      const stats = computeStats(trackPoints);
+      const durationSec = Math.round(durationMs / 1000);
+      const distances = computeRouteDistances(latlngs);
+
+      for (let i = 0; i <= totalFrames; i++) {
+        let t = i / totalFrames;
+        if (loop !== 'yes' && t > 1) t = 1;
+        const markerLatLng = getPointAlongRoute(latlngs, distances, t);
+        tempCtx.drawImage(previewBackground, 0, 0);
+        drawWalker(tempCtx, L.latLng(markerLatLng[0], markerLatLng[1]));
+        drawPreviewOverlay(tempCtx, tempCanvas.width, tempCanvas.height, stats, durationSec, loop);
+        gif.addFrame(tempCanvas, { delay: 1000 / fps, copy: true });
+      }
+
+      return new Promise((resolve, reject) => {
+        gif.on('finished', resolve);
+        gif.on('error', reject);
+        gif.render();
+      });
+    }
+
+    let lastPreviewBlob = null;
+    let lastPreviewExt = 'webm';
+    let isRenderingVideo = false;
 
     function speedToPace(speedMps) {
       if (!speedMps || speedMps <= 0) return 30;
@@ -785,5 +1340,6 @@
     initMap();
     setupUploadEvents();
   </script>
+  <div id="preview-map-host" style="position: fixed; left: -9999px; top: -9999px; width: 1280px; height: 720px; pointer-events: none;"></div>
 </body>
 </html>

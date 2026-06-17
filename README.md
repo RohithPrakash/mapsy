@@ -13,6 +13,7 @@ Built for my personal OpenTracks recordings, but it works with any KML/KMZ that 
 - **Animated playback** with play / pause / reset and a scrubber
 - **Pace gradient**: when speed data is present, the ghost route is colored by pace (slower = lighter, faster = darker)
 - **Customizable progress route**: change line color and thickness
+- **Share preview**: generate a smooth 3–60 second looping route preview as MP4/WebM or GIF, with selectable CartoDB basemap and aspect ratio
 - **Keyboard-accessible** file drop zone
 
 ## Tech Stack
@@ -20,6 +21,8 @@ Built for my personal OpenTracks recordings, but it works with any KML/KMZ that 
 - Vanilla HTML/CSS/JavaScript
 - [Leaflet](https://leafletjs.com/) for the map
 - [JSZip](https://stuk.github.io/jszip/) for KMZ extraction
+- [html2canvas](https://html2canvas.hertzen.com/) for preview background capture
+- [gif.js](https://github.com/jnordberg/gif.js) for GIF encoding
 - CartoDB Voyager basemap tiles
 
 ## Usage
