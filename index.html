@@ -855,12 +855,12 @@
     function drawPreviewOverlay(ctx, width, height, stats, durationSec, loop) {
       // Stats box
       ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-      ctx.fillRect(12, height - 56, 240, 44);
+      ctx.fillRect(12, height - 68, 240, 56);
       ctx.fillStyle = '#1e293b';
       ctx.font = '12px system-ui, sans-serif';
-      ctx.fillText(`Distance: ${(stats.distance / 1000).toFixed(2)} km`, 20, height - 38);
-      ctx.fillText(`Duration: ${stats.durationMs !== null ? formatDuration(stats.durationMs) : '—'}`, 20, height - 24);
-      ctx.fillText(`Elevation: +${stats.elevationGain.toFixed(0)} m / −${stats.elevationLoss.toFixed(0)} m`, 20, height - 10);
+      ctx.fillText(`Distance: ${(stats.distance / 1000).toFixed(2)} km`, 20, height - 50);
+      ctx.fillText(`Duration: ${stats.durationMs !== null ? formatDuration(stats.durationMs) : '—'}`, 20, height - 36);
+      ctx.fillText(`Elevation: +${stats.elevationGain.toFixed(0)} m / −${stats.elevationLoss.toFixed(0)} m`, 20, height - 22);
     }
 
     function drawWalker(ctx, latLng) {
