@@ -890,6 +890,49 @@
       ctx.fill();
     }
 
+    function latLngToCanvasPoint(latLng) {
+      if (!previewMap) return null;
+      const ll = Array.isArray(latLng) ? L.latLng(latLng[0], latLng[1]) : latLng;
+      const point = previewMap.latLngToContainerPoint(ll);
+      return {
+        x: point.x * (previewCanvas.width / previewMap.getContainer().clientWidth),
+        y: point.y * (previewCanvas.height / previewMap.getContainer().clientHeight)
+      };
+    }
+
+    function drawProgressRoute(ctx, t) {
+      if (!previewMap || latlngs.length < 2 || previewRouteDistances.length < 2) return;
+      const total = previewRouteDistances[previewRouteDistances.length - 1];
+      if (total === 0) return;
+      const target = Math.max(0, Math.min(1, t)) * total;
+      const cur = getPointAlongRoute(latlngs, previewRouteDistances, t);
+
+      let i = 1;
+      while (i < previewRouteDistances.length && previewRouteDistances[i] < target) i++;
+
+      const points = [latlngs[0]];
+      for (let j = 1; j < i; j++) points.push(latlngs[j]);
+      points.push(cur);
+
+      const start = latLngToCanvasPoint(points[0]);
+      if (!start) return;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      for (let j = 1; j < points.length; j++) {
+        const p = latLngToCanvasPoint(points[j]);
+        if (!p) continue;
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#3b82f6';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
     function startPreviewAnimation(backgroundCanvas, durationMs, loop) {
       previewBackground = backgroundCanvas;
       previewDurationMs = durationMs;
@@ -907,6 +950,7 @@
         if (loop !== 'yes' && elapsed >= durationMs) t = 1;
 
         ctx.drawImage(previewBackground, 0, 0, previewCanvas.width, previewCanvas.height);
+        drawProgressRoute(ctx, t);
         const markerLatLng = getPointAlongRoute(latlngs, previewRouteDistances, t);
         drawWalker(ctx, L.latLng(markerLatLng[0], markerLatLng[1]));
         drawPreviewOverlay(ctx, previewCanvas.width, previewCanvas.height, stats, durationSec, loop);
@@ -979,13 +1023,14 @@
       const tempCtx = tempCanvas.getContext('2d');
       const stats = computeStats(trackPoints);
       const durationSec = Math.round(durationMs / 1000);
-      const distances = computeRouteDistances(latlngs);
+      previewRouteDistances = computeRouteDistances(latlngs);
 
       for (let i = 0; i <= totalFrames; i++) {
         let t = i / totalFrames;
         if (loop !== 'yes' && t > 1) t = 1;
-        const markerLatLng = getPointAlongRoute(latlngs, distances, t);
+        const markerLatLng = getPointAlongRoute(latlngs, previewRouteDistances, t);
         tempCtx.drawImage(previewBackground, 0, 0);
+        drawProgressRoute(tempCtx, t);
         drawWalker(tempCtx, L.latLng(markerLatLng[0], markerLatLng[1]));
         drawPreviewOverlay(tempCtx, tempCanvas.width, tempCanvas.height, stats, durationSec, loop);
         gif.addFrame(tempCanvas, { delay: 1000 / fps, copy: true });
