@@ -139,6 +139,67 @@
       transition: none !important;
       opacity: 1 !important;
     }
+    #basemap-toggle-main {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    #btn-basemap-layers {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      color: #334155;
+    }
+    #btn-basemap-layers:hover { background: #f8fafc; }
+    #basemap-panel {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    #basemap-panel.hidden { display: none; }
+    .basemap-option {
+      width: 76px;
+      height: 76px;
+      padding: 4px;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      color: #334155;
+      transition: border-color 0.15s;
+    }
+    .basemap-option img {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      object-fit: cover;
+      display: block;
+    }
+    .basemap-option:hover { background: #f1f5f9; }
+    .basemap-option.active { border-color: #3b82f6; }
     @media (max-width: 480px) {
       #controls { width: calc(100% - 2rem); justify-content: center; }
       input[type=range] { width: 100%; }
@@ -251,6 +312,26 @@
     </div>
   </div>
 
+  <div id="basemap-toggle-main">
+    <button id="btn-basemap-layers" title="Layers" aria-label="Choose basemap">☰</button>
+    <div id="basemap-panel" class="hidden">
+      <button class="basemap-option active" data-key="voyager" aria-label="Voyager basemap">
+        <img src="assets/voyager.png" alt="Voyager" />
+        <span>Voyager</span>
+      </button>
+      <button class="basemap-option" data-key="positron" aria-label="Positron basemap">
+        <img src="assets/positron.png" alt="Positron" />
+        <span>Positron</span>
+      </button>
+      <button class="basemap-option" data-key="dark" aria-label="Dark basemap">
+        <img src="assets/dark.png" alt="Dark" />
+        <span>Dark</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="preview-map-host" style="position: fixed; left: -9999px; top: -9999px; width: 1280px; height: 720px; pointer-events: none;"></div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
   <script>
@@ -290,6 +371,8 @@
     let animationFrameId = null;
     let previewMap = null;
     let previewMapTileLayer = null;
+    let currentMainBasemapLayer = null;
+    let currentMainBasemapKey = 'voyager';
     let previewAnimationId = null;
     let previewStartTime = null;
     let previewBackground = null;
@@ -333,6 +416,10 @@
     const btnPreviewClose = document.getElementById('btn-preview-close');
     const btnPreviewDownload = document.getElementById('btn-preview-download');
 
+    const btnBasemapLayers = document.getElementById('btn-basemap-layers');
+    const basemapPanel = document.getElementById('basemap-panel');
+    const basemapOptions = document.querySelectorAll('.basemap-option');
+
     function openPreviewModal() {
       previewModal.classList.remove('hidden');
       previewModal.classList.add('visible');
@@ -344,6 +431,26 @@
     }
 
     btnPreviewClose.addEventListener('click', closePreviewModal);
+
+    btnBasemapLayers.addEventListener('click', (e) => {
+      e.stopPropagation();
+      basemapPanel.classList.toggle('hidden');
+    });
+
+    basemapOptions.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const key = btn.getAttribute('data-key');
+        setMainBasemap(key);
+        basemapOptions.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        basemapPanel.classList.add('hidden');
+      });
+    });
+
+    document.addEventListener('click', () => {
+      basemapPanel.classList.add('hidden');
+    });
 
     btnPreviewDownload.addEventListener('click', async () => {
       if (lastPreviewBlob) {
@@ -961,7 +1068,16 @@
 
     function initMap() {
       map = L.map('map').setView([0, 0], 2);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+      setMainBasemap('voyager');
+    }
+
+    function setMainBasemap(key) {
+      if (!BASEMAP_CONFIGS[key]) return;
+      currentMainBasemapKey = key;
+      if (currentMainBasemapLayer) {
+        map.removeLayer(currentMainBasemapLayer);
+      }
+      currentMainBasemapLayer = L.tileLayer(BASEMAP_CONFIGS[key].url, {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 19
@@ -1340,6 +1456,6 @@
     initMap();
     setupUploadEvents();
   </script>
-  <div id="preview-map-host" style="position: fixed; left: -9999px; top: -9999px; width: 1280px; height: 720px; pointer-events: none;"></div>
+
 </body>
 </html>

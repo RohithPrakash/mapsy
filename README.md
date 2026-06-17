@@ -13,6 +13,7 @@ Built for my personal OpenTracks recordings, but it works with any KML/KMZ that 
 - **Animated playback** with play / pause / reset and a scrubber
 - **Pace gradient**: when speed data is present, the ghost route is colored by pace (slower = lighter, faster = darker)
 - **Customizable progress route**: change line color and thickness
+- **Basemap toggle**: switch the main map between CartoDB Voyager, Positron, and Dark Matter
 - **Share preview**: generate a smooth 3–60 second looping route preview as MP4/WebM or GIF, with selectable CartoDB basemap and aspect ratio
 - **Keyboard-accessible** file drop zone
 
