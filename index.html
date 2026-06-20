@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Walk Visualizer</title>
+  <title>Mapsy - Walk Visualizer</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
@@ -13,25 +13,63 @@
 //# sourceMappingURL=gif.worker.js.map
 
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+  --ink:        #1c2333;
+  --surface:    #f7f4ef;
+  --contour:    #d4c9b5;
+  --elevation:  #3d6b4f;
+  --marker:     #c94f3a;
+  --muted:      #7a7264;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-data:    'Space Mono', monospace;
+
+  --radius-sm:    6px;
+  --radius-md:    10px;
+  --radius-pill:  100px;
+  --shadow-panel: 0 2px 12px rgba(28, 35, 51, 0.12);
+}
     * { box-sizing: border-box; }
-    body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: system-ui, sans-serif; }
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: var(--font-display); color: var(--ink); }
     #map { width: 100vw; height: 100vh; }
     .panel {
       position: absolute;
-      background: rgba(255, 255, 255, 0.9);
-      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--contour);
+      border-radius: var(--radius-md);
       padding: 1rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      box-shadow: var(--shadow-panel);
       z-index: 1000;
     }
     #stats-panel { top: 1rem; left: 1rem; min-width: 220px; max-width: 90vw; }
-    #controls { bottom: 1rem; left: 50%; transform: translateX(-50%); display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-    #stats-panel h1 { margin: 0 0 0.5rem; font-size: 1rem; }
-    #stats-panel p { margin: 0.25rem 0; font-size: 0.9rem; }
-    #stats-panel .error { color: #b91c1c; }
+    #controls { bottom: 1.25rem; left: 50%; transform: translateX(-50%); display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; padding: 0.45rem 0.85rem; border-radius: var(--radius-pill); }
+
+#controls button {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+  font-family: var(--font-display);
+  font-weight: 500;
+  cursor: pointer;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  transition: background 0.12s;
+}
+
+#controls button:hover {
+  background: rgba(28, 35, 51, 0.07);
+}
+
+#btn-play { color: var(--elevation); font-weight: 600; }
+#btn-reset { color: var(--muted); }
+
+input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation); }
     button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
-    input[type=range] { width: 200px; max-width: 60vw; }
     .control-group {
       display: flex;
       align-items: center;
@@ -56,10 +94,33 @@
       text-align: center;
       z-index: 2000;
     }
-    .lander h1 { margin: 0 0 0.5rem; font-size: 1.4rem; }
-    .lander p { margin: 0.5rem 0; font-size: 0.95rem; }
+    .lander-brand {
+  margin: 0 0 0.1rem;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--elevation);
+}
+
+.lander-tagline {
+  margin: 0 0 1rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.lander-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.drop-hint { color: var(--muted); font-size: 0.9rem; }
+.drop-action { color: var(--elevation); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
     .drop-zone {
-      border: 2px dashed #cbd5e1;
+      border: 1.5px dashed var(--contour);
       border-radius: 8px;
       padding: 2rem 1rem;
       margin: 1rem 0;
@@ -67,19 +128,55 @@
       transition: border-color 0.2s, background 0.2s;
     }
     .drop-zone:hover, .drop-zone.drag-over {
-      border-color: #3b82f6;
-      background: rgba(59, 130, 246, 0.05);
+      border-color: var(--elevation);
+      background: rgba(61, 107, 79, 0.04);
     }
     .drop-zone input { display: none; }
     #upload-error { min-height: 1.2em; }
     .hidden { display: none !important; }
-    #pace-legend { margin-top: 0.75rem; }
+    #pace-legend { margin: 0.75rem; }
     .legend-title { font-size: 0.85rem; margin: 0 0 0.25rem; font-weight: 600; }
     .legend-row {
       display: flex;
       align-items: center;
       gap: 0.5rem;
       font-size: 0.8rem;
+    }
+    .panel-eyebrow {
+      margin: 0 0 0.75rem;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.15rem 0.75rem;
+      margin: 0 0 0.75rem;
+      padding: 0;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      white-space: nowrap;
+      align-self: baseline;
+      padding: 0.15rem 0;
+    }
+
+    .stat-value {
+      font-family: var(--font-data);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin: 0;
+      padding: 0.15rem 0;
     }
     #pace-gradient-bar {
       width: 20px;
@@ -156,20 +253,20 @@
       gap: 8px;
     }
     #btn-basemap-layers {
-      width: 44px;
-      height: 44px;
-      border: none;
-      border-radius: 8px;
-      background: #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.25rem;
-      color: #334155;
-    }
-    #btn-basemap-layers:hover { background: #f8fafc; }
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--contour);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+}
+
+#btn-basemap-layers:hover { background: #eeebe4; }
     #basemap-panel {
       background: #fff;
       border-radius: 12px;
@@ -206,29 +303,74 @@
     }
     .basemap-option:hover { background: #f1f5f9; }
     .basemap-option.active { border-color: #3b82f6; }
-    @media (max-width: 480px) {
-      #controls { width: calc(100% - 2rem); justify-content: center; }
-      input[type=range] { width: 100%; }
+    .ctrl-divider {
+      width: 1px;
+      height: 1.1rem;
+      background: var(--contour);
+      flex-shrink: 0;
+      margin: 0 0.15rem;
+      align-self: center;
     }
+
+    @media (max-width: 600px) {
+      #controls {
+        width: calc(100vw - 2rem);
+        left: 1rem;
+        transform: none;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        border-radius: var(--radius-md);
+        justify-content: flex-start;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+      }
+      #controls::-webkit-scrollbar { display: none; }
+      #controls input[type=range] { width: 120px; max-width: 120px; }
+    }
+
+@keyframes walker-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(201, 79, 58, 0.5); }
+  70%  { box-shadow: 0 0 0 9px rgba(201, 79, 58, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(201, 79, 58, 0); }
+}
+
+.walker-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--marker);
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  animation: walker-pulse 1.8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walker-icon { animation: none; }
+}
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="lander" class="panel lander">
-    <h1>Walk Visualizer</h1>
-    <p>Upload a <strong>.kml</strong> or <strong>.kmz</strong> file to visualize your walk.</p>
+    <h1 class="lander-brand">Mapsy</h1>
+    <p class="lander-tagline">Walk Visualizer</p>
+    <p class="lander-hint">Drop a <strong>.kml</strong> or <strong>.kmz</strong> file to see your route.</p>
     <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Upload a KML or KMZ file">
-      <span>Drag & drop a file here, or click to select</span>
+      <span class="drop-hint">Drag &amp; drop, or <span class="drop-action">click to select</span></span>
       <input id="file-input" type="file" accept=".kml,.kmz" />
     </div>
-    <p class="hint">Supported: .kml, .kmz</p>
     <p id="upload-error" class="error"></p>
   </div>
   <div id="stats-panel" class="panel hidden">
-    <h1>Walk Summary</h1>
-    <p id="stat-distance">Distance: —</p>
-    <p id="stat-duration">Duration: —</p>
-    <p id="stat-elevation">Elevation: —</p>
+    <h2 class="panel-eyebrow">Walk Summary</h2>
+    <dl class="stat-grid">
+      <dt class="stat-label">Distance</dt>
+      <dd class="stat-value" id="stat-distance">-</dd>
+      <dt class="stat-label">Duration</dt>
+      <dd class="stat-value" id="stat-duration">-</dd>
+      <dt class="stat-label">Elevation</dt>
+      <dd class="stat-value" id="stat-elevation">-</dd>
+    </dl>
     <div id="pace-legend" class="hidden">
       <p class="legend-title">Pace (min/km)</p>
       <div class="legend-row">
@@ -243,16 +385,25 @@
     <button id="btn-play">Play</button>
     <button id="btn-pause">Pause</button>
     <button id="btn-reset">Reset</button>
+    <span class="ctrl-divider" aria-hidden="true"></span>
     <input id="progress" type="range" min="0" max="100" value="0" step="0.1" aria-label="Playback progress" />
+    <span class="ctrl-divider" aria-hidden="true"></span>
     <label class="control-group">
       Color
       <input id="line-color" type="color" value="#0066cc" />
     </label>
+    <span class="ctrl-divider" aria-hidden="true"></span>
+    <label class="control-group hidden" id="gradient-toggle-group">
+      <input id="gradient-toggle" type="checkbox" checked />
+      Pace color
+    </label>
+    <span class="ctrl-divider" aria-hidden="true"></span>
     <label class="control-group">
       Width
       <input id="line-weight" type="range" min="1" max="12" value="4" />
       <span id="line-weight-value">4</span>
     </label>
+    <span class="ctrl-divider" aria-hidden="true"></span>
     <button id="btn-share-preview">Share preview</button>
   </div>
 
@@ -319,7 +470,11 @@
   </div>
 
   <div id="basemap-toggle-main">
-    <button id="btn-basemap-layers" title="Layers" aria-label="Choose basemap">☰</button>
+    <button id="btn-basemap-layers" title="Layers" aria-label="Choose basemap" aria-expanded="false">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M2 12.5l7 3 7-3M2 9l7 3 7-3M2 5.5l7-3 7 3-7 3-7-3z"/>
+      </svg>
+    </button>
     <div id="basemap-panel" class="hidden">
       <button class="basemap-option active" data-key="voyager" aria-label="Voyager basemap">
         <img src="assets/voyager.png" alt="Voyager" />
@@ -363,7 +518,10 @@
     let ghostRoute = null;
     let ghostRouteGroup = null;
     let ghostSegmentPolylines = [];
+    let progressRouteGroup = null;
+    let progressSegmentPolylines = [];
     let progressRoute = null;
+    let useGradient = true;
     let walker = null;
     let startMarker = null;
     let endMarker = null;
@@ -442,6 +600,7 @@
     btnBasemapLayers.addEventListener('click', (e) => {
       e.stopPropagation();
       basemapPanel.classList.toggle('hidden');
+      btnBasemapLayers.setAttribute('aria-expanded', basemapPanel.classList.contains('hidden') ? 'false' : 'true');
     });
 
     basemapOptions.forEach(btn => {
@@ -859,7 +1018,7 @@
       ctx.fillStyle = '#1e293b';
       ctx.font = '12px system-ui, sans-serif';
       ctx.fillText(`Distance: ${(stats.distance / 1000).toFixed(2)} km`, 20, height - 50);
-      ctx.fillText(`Duration: ${stats.durationMs !== null ? formatDuration(stats.durationMs) : '—'}`, 20, height - 36);
+      ctx.fillText(`Duration: ${stats.durationMs !== null ? formatDuration(stats.durationMs) : '-'}`, 20, height - 36);
       ctx.fillText(`Elevation: +${stats.elevationGain.toFixed(0)} m / −${stats.elevationLoss.toFixed(0)} m`, 20, height - 22);
     }
 
@@ -1134,6 +1293,8 @@
       if (ghostRoute) { map.removeLayer(ghostRoute); ghostRoute = null; }
       if (ghostRouteGroup) { map.removeLayer(ghostRouteGroup); ghostRouteGroup = null; }
       ghostSegmentPolylines = [];
+      if (progressRouteGroup) { map.removeLayer(progressRouteGroup); progressRouteGroup = null; }
+      progressSegmentPolylines = [];
       if (progressRoute) { map.removeLayer(progressRoute); progressRoute = null; }
       if (walker) { map.removeLayer(walker); walker = null; }
       if (startMarker) { map.removeLayer(startMarker); startMarker = null; }
@@ -1185,6 +1346,19 @@
       }
     }
 
+    function rebuildProgressRouteColors() {
+      if (!progressRouteGroup || progressSegmentPolylines.length === 0) return;
+      const baseColor = colorInput.value;
+      const segmentPaces = computeSegmentPaces(trackPoints);
+      const minPace = Math.min(...segmentPaces);
+      const maxPace = Math.max(...segmentPaces);
+      const paceRange = maxPace - minPace || 1;
+      for (let i = 0; i < progressSegmentPolylines.length; i++) {
+        const paceNorm = (segmentPaces[i] - minPace) / paceRange;
+        progressSegmentPolylines[i].setStyle({ color: paceToColor(baseColor, paceNorm) });
+      }
+    }
+
     function updateLegendColors() {
       if (document.getElementById('pace-legend').classList.contains('hidden')) return;
       const segmentPaces = computeSegmentPaces(trackPoints);
@@ -1208,9 +1382,9 @@
       trackPoints = [];
       cumulativeDistances = [];
       totalDistance = 0;
-      document.getElementById('stat-distance').textContent = 'Distance: —';
-      document.getElementById('stat-duration').textContent = 'Duration: —';
-      document.getElementById('stat-elevation').textContent = 'Elevation: —';
+      document.getElementById('stat-distance').textContent = 'Distance: -';
+      document.getElementById('stat-duration').textContent = 'Duration: -';
+      document.getElementById('stat-elevation').textContent = 'Elevation: -';
       document.getElementById('progress').value = 0;
       document.getElementById('upload-error').textContent = '';
       document.getElementById('stats-panel').classList.add('hidden');
@@ -1234,7 +1408,7 @@
 
       const stats = computeStats(trackPoints);
       document.getElementById('stat-distance').textContent = `Distance: ${(stats.distance / 1000).toFixed(2)} km`;
-      document.getElementById('stat-duration').textContent = stats.durationMs !== null ? `Duration: ${formatDuration(stats.durationMs)}` : 'Duration: —';
+      document.getElementById('stat-duration').textContent = stats.durationMs !== null ? `Duration: ${formatDuration(stats.durationMs)}` : 'Duration: -';
       document.getElementById('stat-elevation').textContent = `Elevation: +${stats.elevationGain.toFixed(0)} m / −${stats.elevationLoss.toFixed(0)} m`;
 
       latlngs = trackPoints.map(p => [p.lat, p.lon]);
@@ -1262,6 +1436,30 @@
           ghostSegmentPolylines.push(segment);
         }
 
+        progressRouteGroup = L.featureGroup().addTo(map);
+        progressSegmentPolylines = [];
+        for (let i = 0; i < latlngs.length - 1; i++) {
+          const paceNorm = (segmentPaces[i] - minPace) / paceRange;
+          const segColor = paceToColor(baseColor, paceNorm);
+          const pseg = L.polyline([], {
+            color: segColor,
+            weight: weightInput ? parseInt(weightInput.value, 10) : 4,
+            opacity: 0.9
+          }).addTo(progressRouteGroup);
+          progressSegmentPolylines.push(pseg);
+        }
+
+        progressRoute = L.polyline([], {
+          color: baseColor,
+          weight: weightInput ? parseInt(weightInput.value, 10) : 4,
+          opacity: 0.9
+        }).addTo(map);
+
+        useGradient = true;
+        const gradToggle = document.getElementById('gradient-toggle');
+        if (gradToggle) gradToggle.checked = true;
+        document.getElementById('gradient-toggle-group').classList.remove('hidden');
+
         updatePaceLegend(minPace, maxPace);
       } else {
         ghostRoute = L.polyline(latlngs, {
@@ -1270,13 +1468,16 @@
           opacity: 0.5
         }).addTo(map);
         hidePaceLegend();
-      }
 
-      progressRoute = L.polyline([], {
-        color: colorInput ? colorInput.value : '#0066cc',
-        weight: weightInput ? parseInt(weightInput.value, 10) : 4,
-        opacity: 0.9
-      }).addTo(map);
+        progressRoute = L.polyline([], {
+          color: colorInput ? colorInput.value : '#0066cc',
+          weight: weightInput ? parseInt(weightInput.value, 10) : 4,
+          opacity: 0.9
+        }).addTo(map);
+
+        useGradient = false;
+        document.getElementById('gradient-toggle-group').classList.add('hidden');
+      }
 
       startMarker = L.circleMarker(latlngs[0], { radius: 6, color: '#fff', fillColor: '#22c55e', fillOpacity: 1, weight: 2 })
         .bindPopup('Start')
@@ -1294,13 +1495,13 @@
       }
       totalDistance = cumulativeDistances[cumulativeDistances.length - 1];
 
-      walker = L.circleMarker(latlngs[0], {
-        radius: 8,
-        color: '#fff',
-        fillColor: '#3b82f6',
-        fillOpacity: 1,
-        weight: 2
-      }).addTo(map);
+      const walkerIcon = L.divIcon({
+        className: '',
+        html: '<div class="walker-icon"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      walker = L.marker(latlngs[0], { icon: walkerIcon, zIndexOffset: 500 }).addTo(map);
 
       updateWalker(0);
 
@@ -1347,8 +1548,24 @@
       if (walker) walker.setLatLng(pos);
       progressInput.value = (clamped * 100).toFixed(1);
 
-      const visible = clamped > 0 ? getProgressLatLngs(clamped) : [];
-      if (progressRoute) progressRoute.setLatLngs(visible);
+      if (useGradient && progressSegmentPolylines.length > 0) {
+        const { seg, segProgress } = findSegmentAndOffset(clamped);
+        const [lat1, lon1] = latlngs[seg];
+        const [lat2, lon2] = latlngs[seg + 1] || [lat1, lon1];
+        const interpolated = [lat1 + (lat2 - lat1) * segProgress, lon1 + (lon2 - lon1) * segProgress];
+        for (let i = 0; i < progressSegmentPolylines.length; i++) {
+          if (i < seg) {
+            progressSegmentPolylines[i].setLatLngs([latlngs[i], latlngs[i + 1]]);
+          } else if (i === seg) {
+            progressSegmentPolylines[i].setLatLngs(segProgress > 0 ? [latlngs[i], interpolated] : []);
+          } else {
+            progressSegmentPolylines[i].setLatLngs([]);
+          }
+        }
+      } else {
+        const visible = clamped > 0 ? getProgressLatLngs(clamped) : [];
+        if (progressRoute) progressRoute.setLatLngs(visible);
+      }
     }
 
     function animate(timestamp) {
@@ -1409,13 +1626,25 @@
     colorInput.addEventListener('input', () => {
       if (progressRoute) progressRoute.setStyle({ color: colorInput.value });
       rebuildGhostRouteColors();
+      rebuildProgressRouteColors();
       updateLegendColors();
     });
 
     weightInput.addEventListener('input', () => {
       const weight = parseInt(weightInput.value, 10);
       if (progressRoute) progressRoute.setStyle({ weight });
+      for (const pseg of progressSegmentPolylines) pseg.setStyle({ weight });
       weightValue.textContent = weight;
+    });
+
+    document.getElementById('gradient-toggle').addEventListener('change', (e) => {
+      useGradient = e.target.checked;
+      if (useGradient) {
+        if (progressRoute) progressRoute.setLatLngs([]);
+      } else {
+        for (const pseg of progressSegmentPolylines) pseg.setLatLngs([]);
+      }
+      updateWalker(parseFloat(progressInput.value) / 100);
     });
 
     document.getElementById('btn-upload-another').addEventListener('click', () => {
