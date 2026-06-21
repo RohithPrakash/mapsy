@@ -484,8 +484,9 @@ input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation
       <label for="preview-format">Format</label>
       <select id="preview-format">
         <option value="webm">WebM</option>
-        <option value="mp4" disabled>MP4 (coming soon)</option>
+        <option value="mp4">MP4</option>
       </select>
+      <p id="format-support-note" style="display:none; margin: 0.2rem 0 0; font-size: 0.75rem;"></p>
     </div>
     <div class="preview-field">
       <button id="btn-preview-generate" class="primary">Generate preview</button>
@@ -592,6 +593,19 @@ input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation
     const previewDuration = document.getElementById('preview-duration');
     const previewLoop = document.getElementById('preview-loop');
     const previewFormat = document.getElementById('preview-format');
+    const formatSupportNote = document.getElementById('format-support-note');
+
+    function updateFormatNote() {
+      if (previewFormat.value !== 'mp4') { formatSupportNote.style.display = 'none'; return; }
+      const supported = typeof VideoEncoder !== 'undefined';
+      formatSupportNote.textContent = supported
+        ? 'Uses WebCodecs - Chrome 94+, Safari 16.4+, Firefox 130+'
+        : 'Not supported in this browser. Switch to WebM or update your browser.';
+      formatSupportNote.style.color = supported ? 'var(--muted)' : 'var(--marker)';
+      formatSupportNote.style.display = '';
+    }
+    previewFormat.addEventListener('change', updateFormatNote);
+
     const btnPreviewGenerate = document.getElementById('btn-preview-generate');
     const btnPreviewPanelClose = document.getElementById('btn-preview-panel-close');
 
@@ -653,8 +667,14 @@ input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation
       btnPreviewDownload.textContent = 'Rendering...';
 
       try {
-        const blob = await recordPreviewVideo(previewCanvas, durationMs);
-        lastPreviewExt = blob.type.includes('mp4') ? 'mp4' : 'webm';
+        let blob;
+        if (previewFormat.value === 'mp4') {
+          blob = await generatePreviewMp4(durationMs, loop);
+          lastPreviewExt = 'mp4';
+        } else {
+          blob = await recordPreviewVideo(previewCanvas, durationMs);
+          lastPreviewExt = blob.type.includes('mp4') ? 'mp4' : 'webm';
+        }
         lastPreviewBlob = blob;
         downloadBlob(lastPreviewBlob, formatExportFilename(lastPreviewExt));
       } catch (err) {
@@ -701,16 +721,22 @@ input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation
       lastPreviewBlob = null;
       btnPreviewDownload.textContent = 'Rendering...';
       btnPreviewDownload.disabled = true;
-      recordPreviewVideo(previewCanvas, durationMs)
+
+      const encodePromise = previewFormat.value === 'mp4'
+        ? generatePreviewMp4(durationMs, previewLoop.value)
+        : recordPreviewVideo(previewCanvas, durationMs);
+
+      encodePromise
         .then(blob => {
           lastPreviewBlob = blob;
-          lastPreviewExt = blob.type.includes('mp4') ? 'mp4' : 'webm';
+          lastPreviewExt = previewFormat.value === 'mp4' ? 'mp4' : (blob.type.includes('mp4') ? 'mp4' : 'webm');
           btnPreviewDownload.textContent = 'Download';
           btnPreviewDownload.disabled = false;
           isRenderingVideo = false;
         })
         .catch(err => {
           console.error(err);
+          alert('Export failed: ' + err.message);
           btnPreviewDownload.textContent = 'Download';
           btnPreviewDownload.disabled = false;
           isRenderingVideo = false;
@@ -1169,6 +1195,74 @@ input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation
         recorder.start();
         setTimeout(() => recorder.stop(), durationMs + 200);
       });
+    }
+
+    async function generatePreviewMp4(durationMs, loop, fps = 30) {
+      if (typeof VideoEncoder === 'undefined') {
+        throw new Error('WebCodecs not supported in this browser. Please use WebM format.');
+      }
+
+      const mp4mod = await import('https://esm.sh/mp4-muxer@4');
+      const Muxer = mp4mod.Muxer ?? mp4mod.default?.Muxer;
+      const ArrayBufferTarget = mp4mod.ArrayBufferTarget ?? mp4mod.default?.ArrayBufferTarget;
+      if (!Muxer || !ArrayBufferTarget) throw new Error('Failed to load mp4-muxer');
+
+      const width = previewCanvas.width;
+      const height = previewCanvas.height;
+      const totalFrames = Math.round((durationMs / 1000) * fps);
+
+      const target = new ArrayBufferTarget();
+      const muxer = new Muxer({
+        target,
+        video: { codec: 'avc', width, height },
+        fastStart: 'in-memory',
+      });
+
+      const encoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta ?? undefined),
+        error: (e) => { throw e; },
+      });
+
+      encoder.configure({
+        codec: 'avc1.42E028',  // Baseline profile — no B-frames, no DTS/PTS offset needed
+        width,
+        height,
+        bitrate: 5_000_000,
+        framerate: fps,
+        avc: { format: 'avc' },  // AVCC format required by MP4 container (not Annex B)
+      });
+
+      const offscreen = document.createElement('canvas');
+      offscreen.width = width;
+      offscreen.height = height;
+      const ctx = offscreen.getContext('2d');
+      const stats = computeStats(trackPoints);
+      const durationSec = Math.round(durationMs / 1000);
+      const routeDists = computeRouteDistances(latlngs);
+
+      for (let i = 0; i <= totalFrames; i++) {
+        let t = i / totalFrames;
+        if (loop !== 'yes' && t > 1) t = 1;
+
+        const markerLatLng = getPointAlongRoute(latlngs, routeDists, t);
+        ctx.drawImage(previewBackground, 0, 0, width, height);
+        drawProgressRoute(ctx, t);
+        drawWalker(ctx, L.latLng(markerLatLng[0], markerLatLng[1]));
+        drawPreviewOverlay(ctx, width, height, stats, durationSec, loop);
+
+        const frameDuration = Math.round(1_000_000 / fps);
+        const frame = new VideoFrame(offscreen, {
+          timestamp: Math.round((i / fps) * 1_000_000),
+          duration: frameDuration,
+        });
+        encoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
+        frame.close();
+      }
+
+      await encoder.flush();
+      muxer.finalize();
+
+      return new Blob([target.buffer], { type: 'video/mp4' });
     }
 
     let lastPreviewBlob = null;
