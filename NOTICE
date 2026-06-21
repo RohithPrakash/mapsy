@@ -1,0 +1,82 @@
+Mapsy - KML Walk Visualizer
+Copyright (C) 2026 Rohith P
+
+This project is licensed under the GNU Affero General Public License v3.0 or later.
+See the LICENSE file for the full license text, or visit:
+https://www.gnu.org/licenses/agpl-3.0.html
+
+-------------------------------------------------------------------------------
+
+This product includes or depends on the following third-party software:
+
+-------------------------------------------------------------------------------
+Leaflet 1.9.4
+https://leafletjs.com/
+Copyright (c) 2010-2023, Vladimir Agafonkin
+Copyright (c) 2010-2011, CloudMade
+License: BSD 2-Clause ("Simplified BSD License")
+https://github.com/Leaflet/Leaflet/blob/main/LICENSE
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.
+
+-------------------------------------------------------------------------------
+JSZip 3.10.1
+https://stuk.github.io/jszip/
+Copyright (c) 2009-2016 Stuart Knightley, David Duponchel, Franz Buchinger,
+António Afonso
+License: MIT
+https://github.com/Stuk/jszip/blob/main/LICENSE.markdown
+
+-------------------------------------------------------------------------------
+html2canvas 1.4.1
+https://html2canvas.hertzen.com/
+Copyright (c) 2012 Niklas von Hertzen
+License: MIT
+https://github.com/niklasvh/html2canvas/blob/master/LICENSE
+
+-------------------------------------------------------------------------------
+mp4-muxer
+https://github.com/Vanilagy/mp4-muxer
+Copyright (c) 2023 Vanilagy
+License: MIT
+https://github.com/Vanilagy/mp4-muxer/blob/main/LICENSE
+Loaded at runtime via esm.sh CDN; not bundled with this project.
+
+-------------------------------------------------------------------------------
+Space Grotesk
+https://fonts.google.com/specimen/Space+Grotesk
+Copyright (c) 2017 Florian Karsten (info@floriankarsten.com)
+License: SIL Open Font License 1.1
+https://scripts.sil.org/OFL
+
+-------------------------------------------------------------------------------
+Space Mono
+https://fonts.google.com/specimen/Space+Mono
+Copyright (c) 2016 Colophon Foundry (mail@colophon.org),
+Khyati Trehan (mail@khyatitrehan.com)
+License: SIL Open Font License 1.1
+https://scripts.sil.org/OFL
+
+-------------------------------------------------------------------------------
+CartoDB Basemap Tiles
+https://carto.com/basemaps/
+Map tiles © CARTO, licensed under CC BY 3.0.
+https://creativecommons.org/licenses/by/3.0/
+
+Underlying map data © OpenStreetMap contributors, licensed under ODbL 1.0.
+https://www.openstreetmap.org/copyright
+https://opendatacommons.org/licenses/odbl/
+
+Attribution is displayed in the map UI as required by these licenses.
+-------------------------------------------------------------------------------
