@@ -968,13 +968,14 @@ input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation
     }
 
     function computeCanvasSize(containerWidth, containerHeight, ratioStr) {
+      const even = n => Math.floor(n / 2) * 2;
       const ratio = parseRatio(ratioStr);
-      if (ratio === null) return { width: containerWidth, height: containerHeight };
+      if (ratio === null) return { width: even(containerWidth), height: even(containerHeight) };
       const containerRatio = containerWidth / containerHeight;
       if (containerRatio > ratio) {
-        return { width: Math.round(containerHeight * ratio), height: containerHeight };
+        return { width: even(Math.round(containerHeight * ratio)), height: even(containerHeight) };
       }
-      return { width: containerWidth, height: Math.round(containerWidth / ratio) };
+      return { width: even(containerWidth), height: even(Math.round(containerWidth / ratio)) };
     }
 
     function formatExportFilename(ext) {
@@ -1207,8 +1208,9 @@ input[type=range] { width: 200px; max-width: 60vw; accent-color: var(--elevation
       const ArrayBufferTarget = mp4mod.ArrayBufferTarget ?? mp4mod.default?.ArrayBufferTarget;
       if (!Muxer || !ArrayBufferTarget) throw new Error('Failed to load mp4-muxer');
 
-      const width = previewCanvas.width;
-      const height = previewCanvas.height;
+      const even = n => Math.floor(n / 2) * 2;
+      const width = even(previewCanvas.width);
+      const height = even(previewCanvas.height);
       const totalFrames = Math.round((durationMs / 1000) * fps);
 
       const target = new ArrayBufferTarget();
