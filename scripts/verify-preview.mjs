@@ -22,10 +22,10 @@ await page.click('#btn-share-preview');
 const panelVisible = await page.evaluate(() => !document.getElementById('preview-panel').classList.contains('hidden'));
 assert.strictEqual(panelVisible, true);
 
-// Select Dark Matter, 3s, GIF
+// Select Dark Matter, 3s, webm
 await page.selectOption('#preview-basemap', 'dark');
 await page.selectOption('#preview-duration', '3');
-await page.selectOption('#preview-format', 'gif');
+await page.selectOption('#preview-format', 'webm');
 
 // Generate preview
 await page.click('#btn-preview-generate');
@@ -44,11 +44,11 @@ const canvasNonBlank = await page.evaluate(() => {
 });
 assert.strictEqual(canvasNonBlank, true);
 
-// Download GIF
+// Download webm
 await page.click('#btn-preview-download');
 await page.waitForFunction(() => !!lastPreviewBlob, { timeout: 120000 });
 const ext = await page.evaluate(() => lastPreviewExt);
-assert.strictEqual(ext, 'gif');
+assert.strictEqual(ext, 'webm');
 
 console.log('Preview smoke test passed', { pageError, ext });
 await browser.close();

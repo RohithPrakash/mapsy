@@ -16,7 +16,7 @@ Built for my personal OpenTracks recordings, but it works with any KML/KMZ that 
 - **Pace color toggle**: switch the animated progress line between pace gradient and a solid color
 - **Customizable line**: change color and thickness of the animated progress line; color picker and width slider in the control bar
 - **Basemap toggle**: switch the map between CartoDB Voyager, Positron, and Dark Matter
-- **Share preview**: generate a looping route animation (3–60 seconds) as MP4/WebM or GIF, with selectable basemap and aspect ratio (1:1, 16:9, 9:16)
+- **Share preview**: generate a looping route animation (3–60 seconds) as MP4/WebM, with selectable basemap and aspect ratio (1:1, 16:9, 9:16)
 - **Mobile-friendly controls**: the bottom control bar scrolls horizontally on small screens
 
 ## Tech Stack
@@ -25,7 +25,6 @@ Built for my personal OpenTracks recordings, but it works with any KML/KMZ that 
 - [Leaflet](https://leafletjs.com/) for the map
 - [JSZip](https://stuk.github.io/jszip/) for KMZ extraction
 - [html2canvas](https://html2canvas.hertzen.com/) for preview background capture
-- [gif.js](https://github.com/jnordberg/gif.js) for GIF encoding
 - CartoDB basemap tiles (Voyager, Positron, Dark Matter)
 
 ## Usage
@@ -34,7 +33,7 @@ Built for my personal OpenTracks recordings, but it works with any KML/KMZ that 
 2. Drag a `.kml` or `.kmz` file onto the upload area, or click to select a file.
 3. Use the controls at the bottom to play, pause, or scrub through the animation.
 4. Adjust line color, thickness, and pace coloring from the control bar.
-5. Click **Share preview** to export a video or GIF of the route animation.
+5. Click **Share preview** to export a video of the route animation.
 
 ## Hosting
 
