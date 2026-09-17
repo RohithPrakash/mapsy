@@ -4,6 +4,14 @@ A lightweight, browser-based visualizer for walking, running, and hiking tracks 
 
 Built for my personal OpenTracks recordings, but it works with any KML/KMZ that contains a `<Track>` or `<LineString>`.
 
+## Demo
+
+<video src="demo/walk-preview-2026-09-17.webm" controls loop muted playsinline width="100%"></video>
+
+A share preview exported straight from Mapsy - [download the clip](demo/walk-preview-2026-09-17.webm) if it doesn't play inline.
+
+Want to try it with real data? Grab [`demo/run.kml`](demo/run.kml) and drop it onto the upload area.
+
 ## Features
 
 - **Drag-and-drop upload** for `.kml` and `.kmz` files
