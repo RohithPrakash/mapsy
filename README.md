@@ -6,7 +6,7 @@ Built for my personal OpenTracks recordings, but it works with any KML/KMZ that 
 
 ## Demo
 
-<video src="demo/walk-preview-2026-09-17.webm" controls loop muted playsinline width="100%"></video>
+<video src="https://github.com/user-attachments/assets/9deec178-1d5b-4b6b-8697-f099f11ee73f" controls loop muted playsinline width="100%"></video>
 
 A share preview exported straight from Mapsy - [download the clip](demo/walk-preview-2026-09-17.webm) if it doesn't play inline.
 
